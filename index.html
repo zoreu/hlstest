@@ -44,7 +44,17 @@
                 const modifiedM3U8Url = URL.createObjectURL(blob);
 
                 if (Hls.isSupported()) {
-                    const hls = new Hls();
+                    const hls = new Hls({
+                        xhrSetup: (xhr, url) => {
+                            if (url.startsWith('blob:')) {
+                                return xhr;
+                            }
+                            const proxiedUrl = proxyUrl + encodeURIComponent(url);
+                            xhr.open('GET', proxiedUrl, true);
+                            xhr.responseType = 'arraybuffer';
+                            return xhr;
+                        }
+                    });
                     hls.loadSource(modifiedM3U8Url);
                     hls.attachMedia(video);
                     hls.on(Hls.Events.MANIFEST_PARSED, () => {
