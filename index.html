@@ -28,21 +28,38 @@
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const video = document.getElementById('video');
-        const videoSrc = 'https://corsproxy.io/?http://kplay.red:80/1165973/7001437/12721.m3u8'; // Substitua pelo URL do seu arquivo m3u8
+        const originalM3U8Url = 'http://kplay.red:80/1165973/7001437/12721.m3u8'; // URL original do seu arquivo m3u8
+        const proxyUrl = 'https://corsproxy.io/?';
 
-        if (Hls.isSupported()) {
-            const hls = new Hls();
-            hls.loadSource(videoSrc);
-            hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                video.play();
+        fetch(proxyUrl + encodeURIComponent(originalM3U8Url))
+            .then(response => response.text())
+            .then(data => {
+                // Modificar o conteúdo do m3u8 para passar pelo proxy
+                const modifiedData = data.replace(/(https?:\/\/[^#\s]+)/g, (match) => {
+                    return proxyUrl + encodeURIComponent(match);
+                });
+
+                // Criar um blob com o m3u8 modificado
+                const blob = new Blob([modifiedData], { type: 'application/vnd.apple.mpegurl' });
+                const modifiedM3U8Url = URL.createObjectURL(blob);
+
+                if (Hls.isSupported()) {
+                    const hls = new Hls();
+                    hls.loadSource(modifiedM3U8Url);
+                    hls.attachMedia(video);
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        video.play();
+                    });
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    video.src = modifiedM3U8Url;
+                    video.addEventListener('loadedmetadata', () => {
+                        video.play();
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao carregar o m3u8:', error);
             });
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = videoSrc;
-            video.addEventListener('loadedmetadata', () => {
-                video.play();
-            });
-        }
     });
 </script>
 
