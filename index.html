@@ -34,9 +34,10 @@
         fetch(proxyUrl + encodeURIComponent(originalM3U8Url))
             .then(response => response.text())
             .then(data => {
-                // Modificar o conteúdo do m3u8 para passar pelo proxy
-                const modifiedData = data.replace(/(https?:\/\/[^#\s]+)/g, (match) => {
-                    return proxyUrl + encodeURIComponent(match);
+                // Adicionar a URL base do host aos segmentos HLS
+                const baseUrl = originalM3U8Url.substring(0, originalM3U8Url.lastIndexOf('/') + 1);
+                const modifiedData = data.replace(/(\/hls\/[^\s]+)/g, (match) => {
+                    return proxyUrl + encodeURIComponent(baseUrl + match);
                 });
 
                 // Criar um blob com o m3u8 modificado
@@ -44,40 +45,11 @@
                 const modifiedM3U8Url = URL.createObjectURL(blob);
 
                 if (Hls.isSupported()) {
-                    const hls = new Hls({
-                        xhrSetup: (xhr, url) => {
-                            if (url.startsWith('blob:')) {
-                                return xhr;
-                            }
-                            const proxiedUrl = proxyUrl + encodeURIComponent(url);
-                            xhr.open('GET', proxiedUrl, true);
-                            xhr.responseType = 'arraybuffer';
-                            return xhr;
-                        }
-                    });
+                    const hls = new Hls();
                     hls.loadSource(modifiedM3U8Url);
                     hls.attachMedia(video);
                     hls.on(Hls.Events.MANIFEST_PARSED, () => {
                         video.play();
-                    });
-
-                    hls.on(Hls.Events.ERROR, function(event, data) {
-                        if (data.fatal) {
-                            switch(data.type) {
-                                case Hls.ErrorTypes.NETWORK_ERROR:
-                                    console.error("Fatal network error encountered, trying to recover...");
-                                    hls.startLoad();
-                                    break;
-                                case Hls.ErrorTypes.MEDIA_ERROR:
-                                    console.error("Fatal media error encountered, trying to recover...");
-                                    hls.recoverMediaError();
-                                    break;
-                                default:
-                                    console.error("Fatal error encountered, cannot recover.");
-                                    hls.destroy();
-                                    break;
-                            }
-                        }
                     });
                 } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                     video.src = modifiedM3U8Url;
